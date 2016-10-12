@@ -1,7 +1,6 @@
-from basics import W,H,Board,Bot
+from basics import *
 import numpy as np
-from collections import defaultdict
-
+import utils
 
 dlist = [(1,1),(1,0),(0,1),(1,-1)]
 
@@ -12,7 +11,7 @@ class NPBoard(Board):
 			self._board = np.zeros((W,H), dtype='int8')
 			self._next_empty_y = np.zeros(W, dtype='int8')
 			self.score = 0
-			self.hash = int('0000001'*7,2) << 6
+			self.hash = utils.START_HASH
 
 	
 	def next_boards(self, color):
@@ -24,7 +23,7 @@ class NPBoard(Board):
 		for x in range(W):
 			y = int(self._next_empty_y[x])
 			if y < H:
-				h = (self.hash ^ ((5+color) << (x*7+y+5))) + 1
+				h = utils.move_hash(self.hash, color, x, y)
 				yield (h, x)
 
 	def make_move(self, x, color):
@@ -35,7 +34,7 @@ class NPBoard(Board):
 		nboard._next_empty_y = np.copy(self._next_empty_y)
 		nboard.last_move = x
 
-		nboard.hash = (self.hash ^ ((5+color) << (x*7+y+5))) + 1
+		nboard.hash = utils.move_hash(self.hash, color, x, y)
 		nboard[x,y] = color
 		nboard._next_empty_y[x] += 1
 		
@@ -99,6 +98,15 @@ class NPBoard(Board):
 		self.hash = h
 		self.score = score
 
+	@property
+	def status(self):
+		if abs(self.score) > END_INT:
+			return FIRST_WIN if self.score > 0 else SECOND_WIN
+		if all(self[x,H-1] != 0 for x in range(W)):
+			return DRAW
+		return IN_PROGRESS
+
+
 	def __getitem__(self, key):
 		return int(self._board[key])
 
@@ -111,56 +119,26 @@ class NPBoard(Board):
 
 END_INT = 50000
 CHAIN_SCORE = [0, 0, 100, 300, 100000, 100000, 100000, 100000]
-MASK = 0x1F
 
-moves_from_hash = lambda h: h & 0x1F
-
-def hash_repr(hash):
-	s = bin(hash)[::-1]
-	ss = ' '.join([s[:6],s[6:13],s[13:20],s[20:27],s[27:34],s[34:41],s[41:48],s[48:]])
-	return ss[::-1]
-
-
-class HashTable(dict):
-	def __setitem__(self, key, val):
-		if type(key) is NPBoard:
-			key = key.hash
-		if type(val) is tuple:
-			val = (val[0] << 24) | (val[1]+ (1 << 23))
-		if val > self[key]:
-			super().__setitem__(key, val)
-
-	def __getitem__(self, key):
-		if type(key) is NPBoard:
-			key = key.hash
-		return super().__getitem__(key)
-
-	def depth(self, key):
-		return self[key] >> 24
-
-	def score(self, key):
-		return (self[key] & 0xFFFFFF) - (1 << 23)
-
-	def __missing__(self, key):
-		return 0
 
 
 class Aegis(Bot):
-	def __init__(self, turn, depth=6, time=None, debug=False):
+	def __init__(self, turn, depth=6, time=None, debug=False, quiet=False):
 		super().__init__(turn)
 		self.depth = depth
 		self.time = time
 		self.debug = debug
-		self.table = HashTable()
+		self.table = utils.HashTable()
 		self.board = None
-
-	def shrink_table(self, moves):
-		self.table = HashTable((h,v) for h,v in self.table.items() if moves_from_hash(h) >= moves)
+		self.quiet = quiet
 
 	def generate_move(self, board):
-		print('current table size =',len(self.table))
-		self.shrink_table(moves_from_hash(board.hash))
-		print('table shrunk, now the size =', len(self.table))
+		if self.quiet:
+			self.table.shrink_table(board.hash)
+		else:
+			print('current table size =',len(self.table))
+			self.table.shrink_table(board.hash)
+			print('table shrunk, now the size =', len(self.table))
 
 
 		searched_depth = self.table.depth(board)
@@ -186,14 +164,14 @@ class Aegis(Bot):
 
 	def nega_alpha(self, turn, depth, alpha, beta):
 
+		if abs(self.board.score) > END_INT:
+			self.table[self.board] = (100, END_INT + depth)
+			return -END_INT - depth
+
 		if depth <= 0:
 			s = self.board.score*turn
 			self.table[self.board] = (depth, -s)
 			return s
-
-		if abs(self.board.score) > END_INT:
-			self.table[self.board] = (100, END_INT + depth)
-			return -END_INT - depth
 
 		child_info = [(self.table[h], h, x) for h,x in self.board.next_board_hashes(turn)]
 

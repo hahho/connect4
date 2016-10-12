@@ -1,7 +1,7 @@
 from basics import *
 from bot1 import Aegis, NPBoard
-
-
+from learning_bot import LearningBot, LBoard
+import keras.models
 #setup
 
 def ask_bot_options():
@@ -25,6 +25,7 @@ def ask_bot_options():
 
 current_Bot = Aegis
 current_Board = NPBoard
+#model = keras.models.load_model('model.kmodel')
 assert issubclass(current_Bot, Bot), 'current_BotがBot型になってない'
 assert issubclass(current_Board, Board), 'current_BoardがBoard型になってない'
 
@@ -34,6 +35,7 @@ if input().lower() == 'h':
 else:
 	first_args = ask_bot_options()
 	first_player = current_Bot(1, **first_args)
+	#first_player = current_Bot(1, model=model, **first_args)
 
 print('Second player [(H)uman or (B)ot]: ', end='')
 if input().lower() == 'h':
@@ -41,6 +43,7 @@ if input().lower() == 'h':
 else:
 	second_args = ask_bot_options()
 	second_player = current_Bot(-1, **second_args)
+	#second_player = current_Bot(-1, model=model, **second_args)
 
 if isinstance(first_player, Bot) and isinstance(second_player, Bot):
 	print('# of games: ', end='')
@@ -53,40 +56,6 @@ else:
 
 board = current_Board(starting_board=True)
 history = [board]
-
-def chain_iterators():
-	for y in range(H):
-		yield ((x,y) for x in range(W))
-	for x in range(W):
-		yield ((x,y) for y in range(H))
-	for x,y,l in [(0,2,4),(0,1,5),(0,0,6),(1,0,6),(2,0,5),(3,0,4)]:
-		yield ((x+i,y+i) for i in range(l))
-	for x,y,l in [(0,3,4),(0,4,5),(0,5,6),(1,5,6),(2,5,5),(3,5,4)]:
-		yield ((x+i,y-i) for i in range(l))
-
-FIRST_WIN = 'first_win'
-SECOND_WIN = 'second_win'
-DRAW = 'draw'
-IN_PROGRESS = 'in progress'
-
-def game_status():
-
-	for ite in chain_iterators():
-		turn = 0
-		chain = 0
-		for x,y in ite:
-			if board[x,y] == turn:
-				chain += 1
-			else:
-				turn = board[x,y]
-				chain = 1
-			if chain >= 4 and turn != 0:
-				return FIRST_WIN if turn == 1 else SECOND_WIN
-
-	if all(board[i,H-1] != 0 for i in range(W)):
-		return DRAW
-	return IN_PROGRESS
-
 
 def turn_handling(player):
 	global board,history
@@ -138,23 +107,21 @@ for i in range(1, N+1):
 
 	turn = True
 
-	status = IN_PROGRESS
-	while status is IN_PROGRESS:
+	while board.status is IN_PROGRESS:
 		start = time.time()
 		turn_handling(first_player if turn else second_player)
 		stop = time.time()
 		print('Time =',stop-start, 's')
 		print('--------------')
-		status = game_status()
 		turn = not turn
 
-	if status is FIRST_WIN:
+	if board.status is FIRST_WIN:
 		print(first_player.name,'(First Player) wins')
 		first_wins += 1
-	elif status is SECOND_WIN:
+	elif board.status is SECOND_WIN:
 		print(second_player.name,'(Second Player) wins')
 		second_wins += 1
-	elif status is DRAW:
+	elif board.status is DRAW:
 		print('Draw')
 		draws += 1
 	else:
