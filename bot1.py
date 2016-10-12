@@ -105,24 +105,6 @@ class NPBoard(Board):
 	def __setitem__(self, key, item):
 		self._board[key] = item
 
-	def __repr__(self):
-		s = ' '.join(str(i) for i in range(W))+' \n'
-		r = {-1:'○', 0: '・', 1: '●'}
-		l = {-1:'□', 1: '■'}
-
-		ly = self._next_empty_y[self.last_move]-1
-
-		for y in reversed(range(H)):
-			for x in range(W):
-				if x == self.last_move and y == ly:
-					s+=l[self[x,y]]
-				else:
-					s+=r[self[x,y]]
-			s+='\n'
-
-		s+= 'last move: '+str(self.last_move) +'\n'
-		return s
-
 	def __lt__(self, other):
 		return False
 

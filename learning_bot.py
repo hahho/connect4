@@ -2,7 +2,7 @@ from basics import W,H,Board,Bot
 import numpy as np
 from collections import defaultdict
 
-class NPBoard(Board):
+class LBoard(Board):
 	def __init__(self, starting_board = False):
 		super().__init__(starting_board)
 		if starting_board:
@@ -26,7 +26,7 @@ class NPBoard(Board):
 	def make_move(self, x, color):
 		y = int(self._next_empty_y[x])
 
-		nboard = NPBoard()
+		nboard = LBoard()
 		nboard._board = np.copy(self._board)
 		nboard._next_empty_y = np.copy(self._next_empty_y)
 		nboard.last_move = x
@@ -34,9 +34,8 @@ class NPBoard(Board):
 		nboard.hash = (self.hash ^ ((5+color) << (x*7+y+5))) + 1
 		nboard[x,y] = color
 		nboard._next_empty_y[x] += 1
-		
-
 		return nboard
+
 
 	def Dmake_move(self, x, color, nhash):
 		y = int(self._next_empty_y[x])
@@ -45,26 +44,6 @@ class NPBoard(Board):
 		self[x,y] = color
 		self._next_empty_y[x] += 1
 		
-		dscore = 3 - abs(x-3)
-
-		for dx,dy in dlist:
-			s1 = 0
-			nx, ny = x+dx,y+dy
-			while nx >= 0 and nx < W and ny >= 0 and ny < H and self[nx,ny] == color:
-				s1 += 1
-				nx += dx
-				ny += dy
-
-			s2 = 0
-			nx, ny = x-dx,y-dy
-			while nx >= 0 and nx < W and ny >= 0 and ny < H and self[nx,ny] == color:
-				s2 += 1
-				nx -= dx
-				ny -= dy
-
-			dscore += CHAIN_SCORE[s1+s2+1] - CHAIN_SCORE[s1] - CHAIN_SCORE[s2]
-
-		self.score += dscore*color
 
 	def revert(self, x, h):
 		y = self._next_empty_y[x]-1
@@ -78,23 +57,6 @@ class NPBoard(Board):
 	def __setitem__(self, key, item):
 		self._board[key] = item
 
-	def __repr__(self):
-		s = ' '.join(str(i) for i in range(W))+' \n'
-		r = {-1:'○', 0: '・', 1: '●'}
-		l = {-1:'□', 1: '■'}
-
-		ly = self._next_empty_y[self.last_move]-1
-
-		for y in reversed(range(H)):
-			for x in range(W):
-				if x == self.last_move and y == ly:
-					s+=l[self[x,y]]
-				else:
-					s+=r[self[x,y]]
-			s+='\n'
-
-		s+= 'last move: '+str(self.last_move) +'\n'
-		return s
 
 	def __lt__(self, other):
 		return False
