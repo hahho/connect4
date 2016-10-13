@@ -141,7 +141,7 @@ class Aegis(Bot):
 			print('table shrunk, now the size =', len(self.table))
 
 
-		searched_depth = self.table.depth(board)
+		searched_depth = self.table[board][0]
 
 		self.board = board
 		for d in range(searched_depth+1, self.depth):
@@ -161,6 +161,20 @@ class Aegis(Bot):
 			t *= -1
 
 		return ev, pv
+
+	def generate_move_for_learning(self, board):
+		searched_depth = self.table[board][0]
+
+		self.board = board
+		for d in range(searched_depth+1, self.depth):
+			self.nega_alpha(self.turn, d, -END_INT*10, +END_INT*10)
+		ev = self.nega_alpha(self.turn, self.depth, -END_INT*10, +END_INT*10)
+
+
+		best = max((self.table[h],h,x) for h,x in self.board.next_board_hashes(self.turn))
+
+		board.Dmake_move(best[2],self.turn,best[1])
+		return ev, board
 
 	def nega_alpha(self, turn, depth, alpha, beta):
 
@@ -198,7 +212,7 @@ class Aegis(Bot):
 					break
 
 		if best:
-			self.table[best] += 1
+			self.table[best] = (self.table[best][0], self.table[best][1]+1)
 
 		self.table[self.board] = (depth, -alpha)
 		return alpha

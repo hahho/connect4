@@ -23,9 +23,10 @@ def ask_bot_options():
 
 
 
-current_Bot = Aegis
-current_Board = NPBoard
-#model = keras.models.load_model('model.kmodel')
+current_Bot = LearningBot
+current_Board = LBoard
+#current_Bot = Aegis
+#current_Board = NPBoard
 assert issubclass(current_Bot, Bot), 'current_BotがBot型になってない'
 assert issubclass(current_Board, Board), 'current_BoardがBoard型になってない'
 
@@ -35,7 +36,6 @@ if input().lower() == 'h':
 else:
 	first_args = ask_bot_options()
 	first_player = current_Bot(1, **first_args)
-	#first_player = current_Bot(1, model=model, **first_args)
 
 print('Second player [(H)uman or (B)ot]: ', end='')
 if input().lower() == 'h':
@@ -43,7 +43,6 @@ if input().lower() == 'h':
 else:
 	second_args = ask_bot_options()
 	second_player = current_Bot(-1, **second_args)
-	#second_player = current_Bot(-1, model=model, **second_args)
 
 if isinstance(first_player, Bot) and isinstance(second_player, Bot):
 	print('# of games: ', end='')

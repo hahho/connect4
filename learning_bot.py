@@ -1,9 +1,10 @@
 from basics import *
 import numpy as np
 import utils
+import keras.models
 
 
-INF = 100000
+INF = 6000
 
 class LBoard(Board):
 	def __init__(self, starting_board = False ):
@@ -12,7 +13,7 @@ class LBoard(Board):
 			self._board = np.zeros((W,H), dtype='int8')
 			self._next_empty_y = np.zeros(W, dtype='int8')
 			self.hash = utils.START_HASH
-			self.status = 0
+			self.status = IN_PROGRESS
 
 	
 	def next_boards(self, color):
@@ -88,7 +89,7 @@ class LBoard(Board):
 				self.status = color
 				break
 		else:
-			self.status = 0
+			self.status = IN_PROGRESS
 
 		if y == H-1 and all(self[x,H-1] != 0 for x in range(W)):
 			self.status = DRAW
@@ -99,7 +100,7 @@ class LBoard(Board):
 
 		self._board[x,y] = 0
 		self.hash = h
-		self.status = 0
+		self.status = IN_PROGRESS
 
 
 	def __getitem__(self, key):
@@ -113,23 +114,35 @@ class LBoard(Board):
 
 
 class LearningBot(Bot):
-	def __init__(self, turn, model, depth=6, time=None, debug=False, quiet=False):
+	def __init__(self, turn, model='model.kmodel',
+		depth=6, time=None, debug=False, quiet=False,
+		shared_hashtable = None):
+
 		super().__init__(turn)
 		self.depth = depth
 		self.time = time
 		self.debug = debug
-		self.table = utils.HashTable()
 		self.board = None
-		self.model = model
 		self.quiet = quiet
+		if type(model) == str:
+			self.model = keras.models.load_model(model)
+		else:
+			self.model = model
+
+		if shared_hashtable is not None:
+			self.table = shared_hashtable
+		else:
+			self.table = utils.HashTable()
 
 	def generate_move(self, board):
-		print('current table size =',len(self.table))
-		self.table.shrink_table(board.hash)
-		print('table shrunk, now the size =', len(self.table))
+		if self.quiet:
+			self.table.shrink_table(board.hash)
+		else:
+			print('current table size =',len(self.table))
+			self.table.shrink_table(board.hash)
+			print('table shrunk, now the size =', len(self.table))
 
-
-		searched_depth = self.table.depth(board)
+		searched_depth = self.table[board][0]
 
 		self.board = board
 		for d in range(searched_depth+1, self.depth):
@@ -142,19 +155,36 @@ class LearningBot(Bot):
 			try:
 				board = max((self.table[b], b) for b in board.next_boards(t))[1]
 				pv.append(board)
-				if board.status != 0:
+				if board.status != IN_PROGRESS:
 					break
 			except ValueError:
 				break
 			t *= -1
-
 		return ev, pv
+
+	def generate_move_for_learning(self, board):
+		searched_depth = self.table[board][0]
+
+		self.board = board
+		for d in range(searched_depth+1, self.depth):
+			self.nega_alpha(self.turn, d, -INF, INF)
+		ev = self.nega_alpha(self.turn, self.depth, -INF, INF)
+
+
+		best = max((self.table[h],h,x) for h,x in self.board.next_board_hashes(self.turn))
+
+		board.Dmake_move(best[2],self.turn,best[1])
+		return ev, board
 
 	def nega_alpha(self, turn, depth, alpha, beta):
 
-		if self.board.status != 0: # end state
+		if abs(self.board.status) == 1: # end state
 			self.table[self.board] = (100, depth*10)
 			return -depth*10
+
+		if self.board.status == DRAW:
+			self.table[self.board] = (0, 0)
+			return 0
 
 		if depth <= 0:
 			s = np.asscalar(self.model.predict(self.board._board.reshape((1,42)))*turn)
@@ -163,10 +193,6 @@ class LearningBot(Bot):
 
 
 		child_info = [(self.table[h], h, x) for h,x in self.board.next_board_hashes(turn)]
-
-		if not child_info:
-			self.table[self.board] = (0, 0)
-			return 0
 
 		child_info.sort(reverse=True)
 
@@ -186,7 +212,7 @@ class LearningBot(Bot):
 					break
 
 		if best:
-			self.table[best] += 1
+			self.table[best] = (self.table[best][0], self.table[best][1]+1e-16)
 
 		self.table[self.board] = (depth, -alpha)
 		return alpha

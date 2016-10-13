@@ -23,8 +23,8 @@ class Bot(Player):
 
 FIRST_WIN = 1		# keep these constants
 SECOND_WIN = -1		#
-IN_PROGRESS = 0
-DRAW = 2
+IN_PROGRESS = -2
+DRAW = 0
 
 class Board:
 	def __init__(self, starting_board = False):
