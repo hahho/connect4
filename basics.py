@@ -3,19 +3,18 @@ W = 7
 H = 6
 
 class Player:
-	def __init__(self, name, turn):
+	def __init__(self, name):
 		self.name = name
-		self.turn = turn
 
 class Human(Player):
-	def __init__(self, turn):
-		super().__init__('Human', turn)
+	def __init__(self):
+		super().__init__('Human')
 
 class Bot(Player):
-	def __init__(self, turn):
-		super().__init__('Bot', turn)
+	def __init__(self):
+		super().__init__('Bot')
 
-	def generate_move(self, board):
+	def generate_move(self, board, turn):
 		"""
 		This should return evaluation value, and PV (its reading as a list of boards)
 		"""
@@ -27,9 +26,9 @@ IN_PROGRESS = -2
 DRAW = 0
 
 class Board:
-	def __init__(self, starting_board = False):
-			if starting_board:
-				self.last_move = None
+	def __init__(self, board=None, initialize = False):
+		if initialize:
+			self.last_move = None
 
 	def make_move(self, x, color):
 		pass

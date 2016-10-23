@@ -5,13 +5,29 @@ import utils
 dlist = [(1,1),(1,0),(0,1),(1,-1)]
 
 class NPBoard(Board):
-	def __init__(self, starting_board = False):
-		super().__init__(starting_board)
+	def __init__(self, board = None, starting_board = False):
+		super().__init__(board, starting_board)
 		if starting_board:
 			self._board = np.zeros((W,H), dtype='int8')
 			self._next_empty_y = np.zeros(W, dtype='int8')
 			self.score = 0
 			self.hash = utils.START_HASH
+		elif board:
+			if isinstance(board, NPBoard):
+				self._board = np.copy(board._board)
+				self._next_empty_y = np.copy(board._next_empty_y)
+				self.score = board.score
+				self.hash = board.hash
+			else:
+				self._board = np.zeros((W,H), dtype='int8')
+				self._next_empty_y = np.zeros(W, dtype='int8')
+				self.score = 0
+				self.hash = utils.START_HASH
+
+				for y in range(H):
+					for x in range(W):
+						if board[x,y] != 0:
+							self.Dmake_move(x, board[x,y], utils.move_hash(self.hash, board[x,y],x,y))
 
 	
 	def next_boards(self, color):
@@ -123,8 +139,8 @@ CHAIN_SCORE = [0, 0, 100, 300, 100000, 100000, 100000, 100000]
 
 
 class Aegis(Bot):
-	def __init__(self, turn, depth=6, time=None, debug=False, quiet=False):
-		super().__init__(turn)
+	def __init__(self, depth=6, time=None, debug=False, quiet=False):
+		super().__init__()
 		self.depth = depth
 		self.time = time
 		self.debug = debug
@@ -132,7 +148,7 @@ class Aegis(Bot):
 		self.board = None
 		self.quiet = quiet
 
-	def generate_move(self, board):
+	def generate_move(self, board, turn):
 		if self.quiet:
 			self.table.shrink_table(board.hash)
 		else:
@@ -140,16 +156,18 @@ class Aegis(Bot):
 			self.table.shrink_table(board.hash)
 			print('table shrunk, now the size =', len(self.table))
 
+		if not isinstance(board, NPBoard):
+			board = NPBoard(board=board)
 
 		searched_depth = self.table[board][0]
 
 		self.board = board
 		for d in range(searched_depth+1, self.depth):
-			self.nega_alpha(self.turn, d, -END_INT*10, +END_INT*10)
-		ev = self.nega_alpha(self.turn, self.depth, -END_INT*10, +END_INT*10)
+			self.nega_alpha(turn, d, -END_INT*10, +END_INT*10)
+		ev = self.nega_alpha(turn, self.depth, -END_INT*10, +END_INT*10)
 
 		pv = []
-		t = self.turn
+		t = turn
 		for d in range(self.depth):
 			try:
 				board = max((self.table[b], b) for b in board.next_boards(t))[1]
@@ -162,19 +180,26 @@ class Aegis(Bot):
 
 		return ev, pv
 
-	def generate_move_for_learning(self, board):
+	def generate_move_for_learning(self, board, turn):
+		if not isinstance(board, NPBoard):
+			board = NPBoard(board=board)
 		searched_depth = self.table[board][0]
 
 		self.board = board
 		for d in range(searched_depth+1, self.depth):
-			self.nega_alpha(self.turn, d, -END_INT*10, +END_INT*10)
-		ev = self.nega_alpha(self.turn, self.depth, -END_INT*10, +END_INT*10)
+			self.nega_alpha(turn, d, -END_INT*10, +END_INT*10)
 
+		candidates = []
 
-		best = max((self.table[h],h,x) for h,x in self.board.next_board_hashes(self.turn))
+		original_board = self.board
 
-		board.Dmake_move(best[2],self.turn,best[1])
-		return ev, board
+		for b in self.board.next_boards(turn):
+			self.board = b
+			candidates.append((-self.nega_alpha(-turn,self.depth-1, -END_INT*10, +END_INT*10), b))
+
+		candidates.sort(reverse=True)
+		
+		return (b for s,b in candidates)
 
 	def nega_alpha(self, turn, depth, alpha, beta):
 

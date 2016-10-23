@@ -32,17 +32,17 @@ assert issubclass(current_Board, Board), 'current_BoardがBoard型になって�
 
 print('First player [(H)uman or (B)ot]: ', end='')
 if input().lower() == 'h':
-	first_player = Human(1)
+	first_player = Human()
 else:
 	first_args = ask_bot_options()
-	first_player = current_Bot(1, **first_args)
+	first_player = current_Bot(**first_args)
 
 print('Second player [(H)uman or (B)ot]: ', end='')
 if input().lower() == 'h':
-	second_player = Human(-1)
+	second_player = Human()
 else:
 	second_args = ask_bot_options()
-	second_player = current_Bot(-1, **second_args)
+	second_player = current_Bot(**second_args)
 
 if isinstance(first_player, Bot) and isinstance(second_player, Bot):
 	print('# of games: ', end='')
@@ -56,31 +56,31 @@ else:
 board = current_Board(starting_board=True)
 history = [board]
 
-def turn_handling(player):
+def turn_handling(player, turn):
 	global board,history
 
 	if isinstance(player, Human):
-		print('Move(0...8) or Back(b)?: ', end='')
-		s = input()
 		while True:
+			print('Move(0...8) or Back(b)?: ', end='')
+			s = input()
 			if s.lower() == 'b':
 				history = history[:-2]
 				board = history[-1]
 				print(board)
-				print('Move(0...8) or Back(b)?: ', end='')
-				s = input()
 			else:
 				try:
 					move = int(s)
-					break
+					if 0 <= move and move < W and board[move,H-1] == 0:
+						break
 				except ValueError:
-					continue
-		board = board.make_move(move, player.turn)
+					pass
+
+		board = board.make_move(move, turn)
 		history = history + [board]
 		print(board)
 
 	elif isinstance(player, Bot):
-		ev, pv = player.generate_move(board)
+		ev, pv = player.generate_move(board, turn)
 		board = pv[0]
 		history = history + [board]
 		print(board)
@@ -108,7 +108,7 @@ for i in range(1, N+1):
 
 	while board.status is IN_PROGRESS:
 		start = time.time()
-		turn_handling(first_player if turn else second_player)
+		turn_handling(first_player if turn else second_player, turn)
 		stop = time.time()
 		print('Time =',stop-start, 's')
 		print('--------------')

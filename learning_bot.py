@@ -7,13 +7,30 @@ import keras.models
 INF = 6000
 
 class LBoard(Board):
-	def __init__(self, starting_board = False ):
+	def __init__(self, board=None, starting_board = False):
 		super().__init__(starting_board)
 		if starting_board:
 			self._board = np.zeros((W,H), dtype='int8')
 			self._next_empty_y = np.zeros(W, dtype='int8')
 			self.hash = utils.START_HASH
 			self.status = IN_PROGRESS
+		elif board:
+			if isinstance(board, LBoard):
+				self._board = np.copy(board._board)
+				self._next_empty_y = np.copy(board._next_empty_y)
+				self.status = board.status
+				self.hash = board.hash
+			else:
+				self._board = np.zeros((W,H), dtype='int8')
+				self._next_empty_y = np.zeros(W, dtype='int8')
+				self.hash = utils.START_HASH
+				self.status = IN_PROGRESS
+
+				for y in range(H):
+					for x in range(W):
+						if board[x,y] != 0:
+							self.Dmake_move(x, board[x,y], utils.move_hash(self.hash, board[x,y],x,y))
+
 
 	
 	def next_boards(self, color):
@@ -114,11 +131,11 @@ class LBoard(Board):
 
 
 class LearningBot(Bot):
-	def __init__(self, turn, model='model.kmodel',
+	def __init__(self, model='model.kmodel',
 		depth=6, time=None, debug=False, quiet=False,
 		shared_hashtable = None):
 
-		super().__init__(turn)
+		super().__init__()
 		self.depth = depth
 		self.time = time
 		self.debug = debug
@@ -134,23 +151,26 @@ class LearningBot(Bot):
 		else:
 			self.table = utils.HashTable()
 
-	def generate_move(self, board):
+	def generate_move(self, board, turn):
 		if self.quiet:
 			self.table.shrink_table(board.hash)
 		else:
 			print('current table size =',len(self.table))
 			self.table.shrink_table(board.hash)
 			print('table shrunk, now the size =', len(self.table))
+		
 
+		if not isinstance(board, LBoard):
+			board = LBoard(board=board)
 		searched_depth = self.table[board][0]
 
 		self.board = board
 		for d in range(searched_depth+1, self.depth):
-			self.nega_alpha(self.turn, d, -INF, INF)
-		ev = self.nega_alpha(self.turn, self.depth, -INF, INF)
+			self.nega_alpha(turn, d, -INF, INF)
+		ev = self.nega_alpha(turn, self.depth, -INF, INF)
 
 		pv = []
-		t = self.turn
+		t = turn
 		for d in range(self.depth):
 			try:
 				board = max((self.table[b], b) for b in board.next_boards(t))[1]
@@ -162,19 +182,20 @@ class LearningBot(Bot):
 			t *= -1
 		return ev, pv
 
-	def generate_move_for_learning(self, board):
+	def generate_move_for_learning(self, board, turn):
+		if not isinstance(board, LBoard):
+			board = LBoard(board=board)
 		searched_depth = self.table[board][0]
 
 		self.board = board
 		for d in range(searched_depth+1, self.depth):
-			self.nega_alpha(self.turn, d, -INF, INF)
-		ev = self.nega_alpha(self.turn, self.depth, -INF, INF)
+			self.nega_alpha(turn, d, -INF, INF)
+		ev = self.nega_alpha(turn, self.depth, -INF, INF)
 
 
-		best = max((self.table[h],h,x) for h,x in self.board.next_board_hashes(self.turn))
+		best = max((self.table[h],h,x) for h,x in self.board.next_board_hashes(turn))
 
-		board.Dmake_move(best[2],self.turn,best[1])
-		return ev, board
+		return ev, board.make_move(best[2],turn)
 
 	def nega_alpha(self, turn, depth, alpha, beta):
 
@@ -187,7 +208,7 @@ class LearningBot(Bot):
 			return 0
 
 		if depth <= 0:
-			s = np.asscalar(self.model.predict(self.board._board.reshape((1,42)))*turn)
+			s = np.asscalar(self.model.predict(self.board._board.reshape((1,42))))*turn
 			self.table[self.board] = (depth, -s)
 			return s
 
